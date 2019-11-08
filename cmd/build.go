@@ -76,4 +76,6 @@ func hello() {
 	}
 	fmt.Println(paths)
 	fmt.Println("Prefix Search", t.PrefixSearch("foo"))
+	node, ok := t.Find("foo")
+	fmt.Println("Meta", ok, node.Meta())
 }
