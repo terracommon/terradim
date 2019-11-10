@@ -17,13 +17,10 @@ package cmd
 
 import (
 	"fmt"
-	"log"
-	"os"
 
 	"github.com/derekparker/trie"
+	"github.com/imburbank/terradim/model"
 	"github.com/spf13/cobra"
-
-	"path/filepath"
 )
 
 // buildCmd represents the build command
@@ -57,25 +54,9 @@ func init() {
 }
 
 func hello() {
-	var paths []string
-	t := trie.New()
-	fmt.Println("Hello called")
-	err := filepath.Walk(".",
-		func(path string, info os.FileInfo, err error) error {
-			if err != nil {
-				return err
-			}
-			fmt.Println(path, info.Size())
-
-			t.Add(path, info.Size())
-			paths = append(paths, path)
-			return nil
-		})
-	if err != nil {
-		log.Println(err)
-	}
-	fmt.Println(paths)
-	fmt.Println("Prefix Search", t.PrefixSearch("foo"))
-	node, ok := t.Find("foo")
+	var t *trie.Trie
+	t = model.Create("./test")
+	fmt.Println("Prefix Search", t.PrefixSearch("test/foo"))
+	node, ok := t.Find("test/foo")
 	fmt.Println("Meta", ok, node.Meta())
 }
