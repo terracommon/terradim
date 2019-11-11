@@ -1,0 +1,65 @@
+dim1:
+  name: env
+  dirame: dim1
+  enum: ["local", "dev", "sand", "qa", "prod"]
+dim2:
+  name: install
+  dirname: dim2
+  enum: ["md", "mo", "mt", "ok", "ri", "wv"]
+spec:
+  all:
+    all:
+      version: v1.23.0
+      region: us-east-1
+      batch.size: 100
+      baz: bang
+      b:
+        c: 2
+        d:
+          - 3
+          - 4
+  local:
+    all:
+      accountName: dev
+      version: "$(data.version)"
+  dev:
+    all:
+      accountName: dev
+      version: "$(data.version)"
+  sand:
+    all:
+      accountName: sandbox
+      version: v2.34.0
+    md:
+      version: v2.34.1
+  qa:
+    all:
+      accountName: qa
+  prod:
+    all:
+      accountName: production
+  overrides:
+    - dims:
+        dim1: ["local", "dev"]
+      args:
+        foo: bar
+    - dims:
+        dim2: ["md", "mt"]
+      args:
+        foo: fizz
+    - dims:
+        dim1: ["dev"]
+        dim2: ["mo", "ok"]
+      args:
+        baz: bar
+        b:
+          c: 5
+    - dims:
+        dim1: ["local", "dev", "sand"]
+        dim2: ["ri", "wv"]
+      args:
+        baz: foo
+        b:
+          d:
+            - 8
+            - 9

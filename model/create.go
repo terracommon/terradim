@@ -52,12 +52,13 @@ func Create(dirpath string) *trie.Trie {
 	return model
 }
 
-type args interface{}
+// Args interface
+type Args interface{}
 
 type nodeConfig struct {
 	Name    string          `yaml:"name"`
 	Enum    []string        `yaml:"enum,flow"`
-	ArgsMap map[string]args `yaml:"args,inline"`
+	ArgsMap map[string]Args `yaml:"args,inline"`
 }
 
 func loadConfig(filepath string) (nodeConfig, error) {
