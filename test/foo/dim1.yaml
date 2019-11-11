@@ -1,0 +1,19 @@
+name: env
+enum: 
+  - local
+  - dev
+  - sand
+  - qa
+  - prod
+args:
+  default:
+    foo: bar
+    b:
+      c: 2
+      d:
+        - 3
+        - 4
+  local:
+    default:
+      b:
+        c: 5

@@ -8,24 +8,16 @@ import (
 	"path/filepath"
 
 	"github.com/derekparker/trie"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
-
-// NodeConfig comment
-type NodeConfig struct {
-	A string
-	B struct {
-		C int   `yaml:"c"`
-		D []int `yaml:",flow"`
-	}
-}
 
 // NodeMeta comment
 type NodeMeta struct {
-	Size  int64
-	IsDir bool
+	Config nodeConfig
+	Size   int64
+	IsDir  bool
 	//isEnum bool
-	Config NodeConfig
+	//isConfig bool
 }
 
 // Create trie model
@@ -37,15 +29,19 @@ func Create(dirpath string) *trie.Trie {
 			if err != nil {
 				return err
 			}
-			var config NodeConfig
+			var config nodeConfig
+
 			_, file := filepath.Split(curpath)
-
-			if file == "dim1.yml" {
+			if file == "dim1.yaml" {
 				config, err = loadConfig(curpath)
-				check(err)
-
+				if err != nil {
+					return err
+				}
 			}
-			meta := NodeMeta{Size: info.Size(), IsDir: info.IsDir(), Config: config}
+			meta := NodeMeta{
+				Config: config,
+				Size:   info.Size(),
+				IsDir:  info.IsDir()}
 			fmt.Println(curpath, meta)
 			model.Add(curpath, meta)
 			return nil
@@ -56,20 +52,21 @@ func Create(dirpath string) *trie.Trie {
 	return model
 }
 
-func check(e error) {
-	if e != nil {
-		panic(e)
-	}
+type args interface{}
+
+type nodeConfig struct {
+	Name    string          `yaml:"name"`
+	Enum    []string        `yaml:"enum,flow"`
+	ArgsMap map[string]args `yaml:"args,inline"`
 }
 
-func loadConfig(filepath string) (NodeConfig, error) {
-	var config NodeConfig
+func loadConfig(filepath string) (nodeConfig, error) {
+	var config nodeConfig
 
 	filedata, err := ioutil.ReadFile(filepath)
 	if err != nil {
 		return config, err
 	}
-
 	yaml.Unmarshal(filedata, &config)
 	fmt.Printf("Yaml values:\n%v\n", config)
 	return config, nil

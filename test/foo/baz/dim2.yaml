@@ -1,0 +1,19 @@
+name: install
+enum:
+  - md
+  - mo
+  - mt
+  - ok
+  - ri
+  - wv
+args:
+  default:
+    baz: bang
+    b:
+      c: 2
+      d:
+        - 3
+        - 4
+  md:
+    b:
+      c: 5

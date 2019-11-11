@@ -57,6 +57,7 @@ func hello() {
 	var t *trie.Trie
 	t = model.Create("./test")
 	fmt.Println("Prefix Search", t.PrefixSearch("test/foo"))
-	node, ok := t.Find("test/foo")
-	fmt.Println("Meta", ok, node.Meta())
+	node, ok := t.Find("test/foo/dim1.yaml")
+	meta := node.Meta()
+	fmt.Println("Meta", ok, meta)
 }
