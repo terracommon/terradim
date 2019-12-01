@@ -1,5 +1,6 @@
 name: env
-enum: 
+appendFile: env.yaml
+enum:
   - local
   - dev
   - sand
@@ -9,4 +10,3 @@ args:
   foo: "bar"
   baz: 5
   fizz: true
-  bang: [2, 3, 7]

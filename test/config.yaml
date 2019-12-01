@@ -9,19 +9,33 @@ dim2:
 spec:
   all:
     all:
-      version: v1.23.0
-      region: us-east-1
-      batch.size: 100
-      baz: bang
-      b:
-        c: 2
-        d:
-          - 3
-          - 4
+      args:
+        version: v1.23.0
+        region: us-east-1
+        batch.size: 100
+        baz: bang
+        b:
+          c: 2
+          d:
+            - 3
+            - 4
+    groups:
+      - dim2: ["ri", "wv"]
+        args: 
+  groups:
+    - dim1: ["local", "dev"]
+      args:
+        accountName: dev
+        version: "$(data.version)"
+
   local:
     all:
       accountName: dev
       version: "$(data.version)"
+    groups:
+      - dim2: ["md", "mo"]
+        args:
+          baz: buzz
   dev:
     all:
       accountName: dev

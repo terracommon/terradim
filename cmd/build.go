@@ -60,6 +60,7 @@ func hello() {
 	node, ok := t.Find("test/foo/dim1.yaml")
 	meta := node.Meta()
 	argsMap := meta.(model.NodeMeta).Config.ArgsMap
-	fmt.Println("Meta", ok, argsMap["args"].(map[string]model.Args)["local"])
-	fmt.Printf("ArgsMap type: %T\n", argsMap["args"])
+	args := argsMap["args"].(map[string]interface{})
+	fmt.Println("Meta", ok, args["bang"])
+	fmt.Printf("ArgsMap type: %T\n", args["bang"])
 }

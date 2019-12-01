@@ -1,0 +1,13 @@
+name: install
+appendFile: install.yaml
+enum:
+  - md
+  - mo
+  - mt
+  - ok
+  - ri
+  - wv
+args:
+  baz: bang
+  foo: n2
+  argevel: 2
