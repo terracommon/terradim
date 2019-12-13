@@ -1,0 +1,9 @@
+name: install
+outfile: install.yaml
+enum:
+  - md
+  - mo
+  - mt
+  - ok
+  - ri
+  - wv

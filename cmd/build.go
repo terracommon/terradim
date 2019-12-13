@@ -18,9 +18,9 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/derekparker/trie"
 	"github.com/imburbank/terradim/model"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 // buildCmd represents the build command
@@ -34,8 +34,10 @@ Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("build called")
-		hello()
+		dir := viper.GetString("dir")
+		fmt.Println("Building", dir)
+		t, buildConfig := buildModel(dir)
+		_ = buildDirTree(t, buildConfig)
 	},
 }
 
@@ -51,16 +53,33 @@ func init() {
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
 	// buildCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+
+	buildCmd.Flags().StringP("dir", "d", "terradim", "Path to dir to build")
+	viper.BindPFlag("dir", buildCmd.Flags().Lookup("dir"))
 }
 
-func hello() {
-	var t *trie.Trie
-	t = model.Create("./test")
-	fmt.Println("Prefix Search", t.PrefixSearch("test/foo"))
-	node, ok := t.Find("test/foo/dim1.yaml")
-	meta := node.Meta()
-	argsMap := meta.(model.NodeMeta).Config.ArgsMap
-	args := argsMap["args"].(map[string]interface{})
-	fmt.Println("Meta", ok, args["bang"])
-	fmt.Printf("ArgsMap type: %T\n", args["bang"])
+func buildModel(rootPath string) (*model.Tree, model.BuildConfig) {
+	if rootPath[:2] == "./" {
+		rootPath = rootPath[2:]
+	}
+	t, buildConfig := model.Create(rootPath)
+	val := "test/terradim/dim1/dim1_config/"
+	node, ok := t.Find(val[:len(val)-1])
+	if ok {
+		children := node.Children()
+		fmt.Println("META", node.Meta())
+		for i, child := range children {
+			fmt.Println("Test Child: ", i, child.Meta().(model.NodeMeta))
+		}
+	} else {
+		fmt.Println("NOT FOUND")
+	}
+	fmt.Println("Build Config", buildConfig)
+	fmt.Printf("dim1: %+v\n", *buildConfig.ConfigMap["dim1"])
+	return t, buildConfig
+}
+
+func buildDirTree(t *model.Tree, config model.BuildConfig) error {
+	err := model.Write(t, config)
+	return err
 }

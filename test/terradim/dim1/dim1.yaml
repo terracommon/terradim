@@ -1,0 +1,8 @@
+name: env
+outfile: env.yaml
+enum:
+  - local
+  - dev
+  - sand
+  - qa
+  - prod

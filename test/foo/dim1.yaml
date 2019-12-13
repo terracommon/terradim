@@ -1,10 +1,5 @@
 name: env
-enum: 
-  - local
-  - dev
-  - sand
-  - qa
-  - prod
+enum: [local, dev, sand, qa, prod]
 args:
   foo: "bar"
   baz: 5
