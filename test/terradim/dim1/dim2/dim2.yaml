@@ -3,7 +3,7 @@ outfile: install.yaml
 enum:
   - md
   - mo
-  - mt
-  - ok
-  - ri
-  - wv
+#  - mt
+#  - ok
+#  - ri
+#  - wv

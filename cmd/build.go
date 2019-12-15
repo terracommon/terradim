@@ -58,7 +58,7 @@ func init() {
 	viper.BindPFlag("dir", buildCmd.Flags().Lookup("dir"))
 }
 
-func buildModel(rootPath string) (*model.Tree, model.BuildConfig) {
+func buildModel(rootPath string) (*model.Tree, *model.BuildConfig) {
 	if rootPath[:2] == "./" {
 		rootPath = rootPath[2:]
 	}
@@ -74,12 +74,12 @@ func buildModel(rootPath string) (*model.Tree, model.BuildConfig) {
 	} else {
 		fmt.Println("NOT FOUND")
 	}
-	fmt.Println("Build Config", buildConfig)
+	fmt.Println("Build Config", *buildConfig)
 	fmt.Printf("dim1: %+v\n", *buildConfig.ConfigMap["dim1"])
 	return t, buildConfig
 }
 
-func buildDirTree(t *model.Tree, config model.BuildConfig) error {
+func buildDirTree(t *model.Tree, config *model.BuildConfig) error {
 	err := model.Write(t, config)
 	return err
 }

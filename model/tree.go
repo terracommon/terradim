@@ -1,6 +1,7 @@
 package model
 
 import (
+	"fmt"
 	"os"
 	"sort"
 	"strings"
@@ -37,7 +38,7 @@ type Tree struct {
 }
 
 // WalkFunc is func signature for WalkSubtree
-type WalkFunc func(node *Node, err error) (bool, error)
+type WalkFunc func(node *Node, data interface{}) (bool, error)
 
 // IsLeaf returns true if node has no children
 func (n *Node) IsLeaf() bool {
@@ -52,6 +53,21 @@ func (n *Node) IsRoot() bool {
 // Meta returns data stored in node
 func (n *Node) Meta() interface{} {
 	return n.meta
+}
+
+// Sep returns node sep
+func (n *Node) Sep() string {
+	return *n.sep
+}
+
+// Key returns node key
+func (n *Node) Key() string {
+	return n.key
+}
+
+// Path returns full node path
+func (n *Node) Path() string {
+	return fmt.Sprintf("%s%s%s", n.prefix, *n.sep, n.key)
 }
 
 // Children returns children stored in node
@@ -155,7 +171,7 @@ func (t *Tree) Insert(path string, meta interface{}) (node *Node, isNew bool) {
 
 		if node == nil {
 			node = &Node{
-				prefix: removeEndSeparators(path[:len(search)], sep),
+				prefix: removeEndSeparators(path[:len(path)-len(search)], sep),
 				key:    key,
 				sep:    &t.separator,
 				parent: parent,
@@ -255,15 +271,15 @@ func (t *Tree) Find(path string) (*Node, bool) {
 }
 
 // WalkSubtree visits children of a node and runs WalkFunc
-func WalkSubtree(node *Node, walkFn WalkFunc) error {
-	ok, err := walkFn(node, nil)
+func WalkSubtree(node *Node, walkFn WalkFunc, data interface{}) error {
+	ok, err := walkFn(node, data)
 	if err != nil {
 		return err
 	}
 	if ok {
 		children := node.Children()
 		for _, child := range children {
-			WalkSubtree(child, walkFn)
+			WalkSubtree(child, walkFn, data)
 		}
 	}
 	return nil

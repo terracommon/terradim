@@ -1,17 +1,20 @@
 package model
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclsyntax"
 	"github.com/hashicorp/terraform/lang"
 	"github.com/zclconf/go-cty/cty"
+
 	//"github.com/zclconf/go-cty/cty/gocty"
 	"gopkg.in/yaml.v3"
 )
@@ -27,13 +30,12 @@ type TerradimConfigMap map[string]*TerradimConfig
 
 // NodeMeta comment
 type NodeMeta struct {
-	Dirname    string
-	Basename   string
-	Size       int64
-	IsFileRoot bool
-	IsDir      bool
-	IsEnum     bool
-	IsConfig   bool
+	Dirname  string
+	Basename string
+	Size     int64
+	IsDir    bool
+	IsEnum   bool
+	IsConfig bool
 }
 
 // BuildConfig contains all build congig details
@@ -50,14 +52,15 @@ var ModelConfig = TerradimConfigMap{
 }
 
 // Create tree model
-func Create(dirpath string) (*Tree, BuildConfig) {
+func Create(dirpath string) (*Tree, *BuildConfig) {
 	var (
 		parent     *Node
+		node       *Node
 		parentMeta NodeMeta
 	)
 	outDir := "live"
 	dirname, basename := filepath.Split(dirpath)
-	buildConfig := BuildConfig{
+	buildConfig := &BuildConfig{
 		ConfigMap:      ModelConfig,
 		FileRootPrefix: dirpath,
 		FileOutPrefix:  dirpath[:len(dirname)] + outDir,
@@ -80,16 +83,16 @@ func Create(dirpath string) (*Tree, BuildConfig) {
 				parent, _ = model.Find(dirname[:len(dirname)-1])
 				if parent.meta == nil {
 					parentMeta = NodeMeta{}
-					meta.IsFileRoot = true
-					fmt.Printf("IS FILE ROOT: %+v\n", meta)
 				} else {
 					parentMeta = parent.Meta().(NodeMeta)
-					fmt.Printf("Parent Meta: %+v\n", parentMeta)
 				}
 			}
 			if info.IsDir() {
 				meta.IsDir = true
 				if _, ok := ModelConfig[basename]; ok == true {
+					if err != nil {
+						panic(err)
+					}
 					meta.IsEnum = true
 					buildConfig.ConfigMap[basename].Path = curpath
 				} else {
@@ -111,8 +114,9 @@ func Create(dirpath string) (*Tree, BuildConfig) {
 			if parentMeta.IsConfig == true {
 				meta.IsConfig = true
 			}
-			fmt.Println(curpath, meta)
-			_, _ = model.Insert(curpath, meta)
+			//fmt.Println(curpath, meta)
+			node, _ = model.Insert(curpath, meta)
+			fmt.Println(curpath, meta, node.prefix, node.key)
 			return nil
 		})
 	if err != nil {
@@ -184,26 +188,67 @@ func loadConfig(curPath string) (nodeConfig, error) {
 }
 
 // Write model to file
-func Write(t *Tree, config BuildConfig) error {
+func Write(t *Tree, config *BuildConfig) error {
 	root := t.Root()
 	fmt.Printf("Root: %+v\n", root)
-	WalkSubtree(root, buildFunc)
+	WalkSubtree(root, buildFunc, map[string]interface{}{"buildConfig": config})
 	return nil
 }
 
 // buildFunc is a Tree WalkFunc for writing model to filesystem
-func buildFunc(node *Node, err error) (bool, error) {
+func buildFunc(node *Node, data interface{}) (bool, error) {
 	if node.Meta() == nil {
 		return true, nil
 	}
 	meta := node.Meta().(NodeMeta)
-	fmt.Println("Walk: ", meta.Dirname, meta.Basename)
-
+	key := node.Key()
+	sep := node.Sep()
+	path := node.Path()
+	dataMap := data.(map[string]interface{})
+	buildConfig, ok := dataMap["buildConfig"].(*BuildConfig)
+	if ok == false {
+		return false, errors.New("buildFunc: Must pass in BuildConfig as data")
+	}
+	writePath := buildConfig.FileOutPrefix + node.Path()[len(buildConfig.FileRootPrefix):]
+	//fmt.Println("Walk: ", meta.Dirname, meta.Basename, dataMap)
+	if meta.IsConfig {
+		if meta.IsDir == false {
+			//fmt.Printf("Config %s\n", writePath)
+		}
+		return false, nil
+	}
 	if meta.IsEnum && meta.IsDir {
 		// Iterate through enum subtrees and write config files
-	} else if meta.IsConfig == false {
-		// Write dir or file
+		//fmt.Printf("Enum: %s\n", node.Path())
+		keyNum, err := strconv.Atoi(key[len(key)-1:])
+		if err != nil {
+			return false, err
+		}
+		for _, enum := range buildConfig.ConfigMap[key].Config.Enum {
+			dataMap[key] = enum
+			for dim := range buildConfig.ConfigMap {
+				if _, ok := dataMap[dim].(string); ok && dim != key {
+					dimLevel, err := strconv.Atoi(dim[len(dim)-1:])
+					if err != nil {
+						panic(err)
+					}
+					if dimLevel > keyNum {
+						delete(dataMap, dim)
+					}
+				}
+			}
+			for _, child := range node.Children() {
+				WalkSubtree(child, buildFunc, dataMap)
+			}
+		}
+		return false, nil
 	}
-
+	for dim := range buildConfig.ConfigMap {
+		if val, ok := dataMap[dim]; ok {
+			writePath = strings.Replace(writePath, fmt.Sprintf("%s%s%s", sep, dim, sep),
+				fmt.Sprintf("%s%s%s", sep, val, sep), 1)
+		}
+	}
+	fmt.Printf("Write from: %s - to: %s\n", path, writePath)
 	return true, nil
 }
