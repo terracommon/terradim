@@ -4,7 +4,6 @@ go 1.13
 
 require (
 	github.com/bmatcuk/doublestar v1.2.0 // indirect
-	github.com/derekparker/trie v0.0.0-20190812220523-e66023ee76eb
 	github.com/hashicorp/hcl/v2 v2.1.0
 	github.com/hashicorp/terraform v0.12.16
 	github.com/mitchellh/go-homedir v1.1.0
