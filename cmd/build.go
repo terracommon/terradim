@@ -1,18 +1,3 @@
-/*
-Copyright © 2019 NAME HERE <EMAIL ADDRESS>
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
 package cmd
 
 import (
@@ -26,13 +11,11 @@ import (
 // buildCmd represents the build command
 var buildCmd = &cobra.Command{
 	Use:   "build",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Short: "Build terradim directory to live layout",
+	Long: `Build a terradim model from the src directory and write
+	with resolved configs to the dst directory. For example:
+...
+WARNING: This command will replace the contents of the dst directory.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		src := viper.GetString("src")
 		dst := viper.GetString("dst")
@@ -56,10 +39,10 @@ func init() {
 	// is called directly, e.g.:
 	// buildCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 
-	buildCmd.Flags().StringP("src", "s", "test/terradim", "Path terradim input")
+	buildCmd.Flags().StringP("src", "s", "terraform/terradim", "Path terradim input")
 	viper.BindPFlag("src", buildCmd.Flags().Lookup("src"))
 
-	buildCmd.Flags().StringP("dst", "d", "test/live", "Path to build output")
+	buildCmd.Flags().StringP("dst", "d", "terraform/live", "Path to build output")
 	viper.BindPFlag("dst", buildCmd.Flags().Lookup("dst"))
 }
 
