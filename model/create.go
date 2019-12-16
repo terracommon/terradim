@@ -14,8 +14,7 @@ import (
 	"github.com/hashicorp/hcl/v2/hclsyntax"
 	"github.com/hashicorp/terraform/lang"
 	"github.com/zclconf/go-cty/cty"
-
-	//"github.com/zclconf/go-cty/cty/gocty"
+	"github.com/zclconf/go-cty/cty/gocty"
 	"gopkg.in/yaml.v3"
 )
 
@@ -43,7 +42,10 @@ type BuildConfig struct {
 	ConfigMap      TerradimConfigMap
 	FileRootPrefix string
 	FileOutPrefix  string
+	PathSeparator  string
 }
+
+type buildData map[string]interface{}
 
 // ModelConfig list enumerable dirs
 var ModelConfig = TerradimConfigMap{
@@ -60,12 +62,13 @@ func Create(dirpath string) (*Tree, *BuildConfig) {
 	)
 	outDir := "live"
 	dirname, basename := filepath.Split(dirpath)
+	model := NewTree()
 	buildConfig := &BuildConfig{
 		ConfigMap:      ModelConfig,
 		FileRootPrefix: dirpath,
 		FileOutPrefix:  dirpath[:len(dirname)] + outDir,
+		PathSeparator:  model.Separator(),
 	}
-	model := NewTree()
 	lastDirname := dirpath
 	err := filepath.Walk(dirpath,
 		func(curpath string, info os.FileInfo, err error) error {
@@ -191,7 +194,7 @@ func loadConfig(curPath string) (nodeConfig, error) {
 func Write(t *Tree, config *BuildConfig) error {
 	root := t.Root()
 	fmt.Printf("Root: %+v\n", root)
-	WalkSubtree(root, buildFunc, map[string]interface{}{"buildConfig": config})
+	WalkSubtree(root, buildFunc, buildData{"buildConfig": config})
 	return nil
 }
 
@@ -200,16 +203,18 @@ func buildFunc(node *Node, data interface{}) (bool, error) {
 	if node.Meta() == nil {
 		return true, nil
 	}
+	var (
+		err       error
+		writePath string
+	)
 	meta := node.Meta().(NodeMeta)
 	key := node.Key()
-	sep := node.Sep()
 	path := node.Path()
-	dataMap := data.(map[string]interface{})
+	dataMap := data.(buildData)
 	buildConfig, ok := dataMap["buildConfig"].(*BuildConfig)
 	if ok == false {
 		return false, errors.New("buildFunc: Must pass in BuildConfig as data")
 	}
-	writePath := buildConfig.FileOutPrefix + node.Path()[len(buildConfig.FileRootPrefix):]
 	//fmt.Println("Walk: ", meta.Dirname, meta.Basename, dataMap)
 	if meta.IsConfig {
 		if meta.IsDir == false {
@@ -218,12 +223,11 @@ func buildFunc(node *Node, data interface{}) (bool, error) {
 		return false, nil
 	}
 	if meta.IsEnum && meta.IsDir {
-		// Iterate through enum subtrees and write config files
-		//fmt.Printf("Enum: %s\n", node.Path())
 		keyNum, err := strconv.Atoi(key[len(key)-1:])
 		if err != nil {
 			return false, err
 		}
+
 		for _, enum := range buildConfig.ConfigMap[key].Config.Enum {
 			dataMap[key] = enum
 			for dim := range buildConfig.ConfigMap {
@@ -237,18 +241,150 @@ func buildFunc(node *Node, data interface{}) (bool, error) {
 					}
 				}
 			}
+			writePath, err = copyToDst(path, &dataMap)
+			if err != nil {
+				return true, err
+			}
+			fmt.Printf("Write: %s   ->   %s\n", path, writePath)
+
 			for _, child := range node.Children() {
 				WalkSubtree(child, buildFunc, dataMap)
 			}
 		}
 		return false, nil
 	}
+	writePath, err = copyToDst(path, &dataMap)
+	if err != nil {
+		return true, err
+	}
+	fmt.Printf("Write: %s   ->   %s\n", path, writePath)
+	return true, nil
+}
+
+func createWritePath(src string, data *buildData) (dst string, err error) {
+	dataMap := *data
+	buildConfig, ok := dataMap["buildConfig"].(*BuildConfig)
+	if ok == false {
+		return "", errors.New("buildFunc: Must pass in BuildConfig as data")
+	}
+
+	dst = buildConfig.FileOutPrefix + src[len(buildConfig.FileRootPrefix):]
+	sep := buildConfig.PathSeparator
+
 	for dim := range buildConfig.ConfigMap {
 		if val, ok := dataMap[dim]; ok {
-			writePath = strings.Replace(writePath, fmt.Sprintf("%s%s%s", sep, dim, sep),
+			dst = strings.Replace(dst, fmt.Sprintf("%s%s%s", sep, dim, sep),
 				fmt.Sprintf("%s%s%s", sep, val, sep), 1)
+
+			if dir, file := filepath.Split(dst); file == dim {
+				dst = fmt.Sprintf("%s%s", dir, val)
+			}
 		}
 	}
-	fmt.Printf("Write from: %s - to: %s\n", path, writePath)
-	return true, nil
+	return
+}
+
+func copyToDst(path string, data *buildData) (dst string, err error) {
+	dst, err = createWritePath(path, data)
+	if err != nil {
+		return
+	}
+
+	err = Copy(path, dst)
+	return
+}
+
+func collectDimConfigs(enumNode *Node, data *buildData) ([]string, error) {
+	dims := []string{}
+	dataMap := *data
+	ext := ".yaml"
+	key := enumNode.Key()
+	configNode := enumNode.getChild(key + "_config")
+	dimBase := key[:len(key)-1]
+	dimLevel, err := strconv.Atoi(key[len(key)-1:])
+	if err != nil {
+		return nil, err
+	}
+
+	if child := configNode.getChild(dataMap[key].(string) + ext); child != nil {
+		dims = append(dims, child.Path())
+	}
+	if child := configNode.getChild(dataMap[key].(string)); child != nil && dimLevel == 2 {
+		if gChild := configNode.getChild(dataMap[key].(string) + ext); gChild != nil {
+			dims = append(dims, gChild.Path())
+		}
+		gridKey := fmt.Sprintf("%s_%s%s", key, dataMap[dimBase+"1"], ext)
+		if gChild := configNode.getChild(dataMap[key].(string) + ext); gChild != nil {
+			dims = append(dims, gChild.Path())
+		}
+		if gChild := configNode.getChild(gridKey); gChild != nil {
+			dims = append(dims, gChild.Path())
+		}
+	}
+	return dims, nil
+}
+
+func mergeDimConfigs(configPaths []string) (string, error) {
+	for i, val := range configPaths {
+		configPaths[i] = fmt.Sprintf(`yamldecode(file("%s"))`, val)
+	}
+
+	exprTxt := fmt.Sprintf(`yamlencode(merge(%s))`, strings.Join(configPaths, ","))
+	// TODO: Figure out how to set filename
+	fileName := "config"
+	expr, parseDiags := hclsyntax.ParseExpression([]byte(exprTxt), fileName, hcl.Pos{Line: 1, Column: 1})
+	if parseDiags.HasErrors() {
+		for _, diag := range parseDiags {
+			fmt.Println(diag.Error())
+		}
+		return "", errors.New("mergeDimConfigs: ParseExpression Error")
+	}
+
+	scope := &lang.Scope{
+		BaseDir: ".",
+	}
+	got, diags := scope.EvalExpr(expr, cty.String)
+	if diags.HasErrors() {
+		for _, diag := range diags {
+			fmt.Printf("%s: %s", diag.Description().Summary, diag.Description().Detail)
+		}
+		panic("EvalExpr Error")
+	}
+
+	var config string
+	err := gocty.FromCtyValue(got, config)
+	return config, err
+}
+
+func writeDimConfig(enumNode *Node, data *buildData) (string, error) {
+	dataMap := *data
+	buildConfig, ok := dataMap["buildConfig"].(*BuildConfig)
+	if ok == false {
+		return "", errors.New("buildFunc: Must pass in BuildConfig as data")
+	}
+
+	configPaths, err := collectDimConfigs(enumNode, data)
+	if err != nil {
+		return "", err
+	}
+
+	dimConfig, err := mergeDimConfigs(configPaths)
+	if err != nil {
+		return "", err
+	}
+
+	configName := buildConfig.ConfigMap[enumNode.Key()].Config.Outfile
+	path := fmt.Sprintf("%s%s%s", enumNode.Path(), enumNode.Sep(), configName)
+	dst, err := createWritePath(path, data)
+	if err != nil {
+		return "", err
+	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		return "", err
+	}
+
+	err = ioutil.WriteFile(dst, []byte(dimConfig), info.Mode())
+	return dst, err
 }
