@@ -3,6 +3,6 @@ outfile: env.yaml
 enum:
   - local
   - dev
-#  - sand
-#  - qa
-#  - prod
+  - sand
+  - qa
+  - prod

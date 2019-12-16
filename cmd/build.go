@@ -34,10 +34,12 @@ Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		dir := viper.GetString("dir")
-		fmt.Println("Building", dir)
-		t, buildConfig := buildModel(dir)
+		src := viper.GetString("src")
+		dst := viper.GetString("dst")
+		fmt.Printf("Building from %s to %s\n", src, dst)
+		t, buildConfig := buildModel(src, dst)
 		_ = buildDirTree(t, buildConfig)
+		fmt.Println("Build Complete")
 	},
 }
 
@@ -54,28 +56,18 @@ func init() {
 	// is called directly, e.g.:
 	// buildCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 
-	buildCmd.Flags().StringP("dir", "d", "terradim", "Path to dir to build")
-	viper.BindPFlag("dir", buildCmd.Flags().Lookup("dir"))
+	buildCmd.Flags().StringP("src", "s", "test/terradim", "Path terradim input")
+	viper.BindPFlag("src", buildCmd.Flags().Lookup("src"))
+
+	buildCmd.Flags().StringP("dst", "d", "test/live", "Path to build output")
+	viper.BindPFlag("dst", buildCmd.Flags().Lookup("dst"))
 }
 
-func buildModel(rootPath string) (*model.Tree, *model.BuildConfig) {
-	if rootPath[:2] == "./" {
-		rootPath = rootPath[2:]
+func buildModel(src, dst string) (*model.Tree, *model.BuildConfig) {
+	if src[:2] == "./" {
+		src = src[2:]
 	}
-	t, buildConfig := model.Create(rootPath)
-	val := "test/terradim/dim1/dim1_config/"
-	node, ok := t.Find(val[:len(val)-1])
-	if ok {
-		children := node.Children()
-		fmt.Println("META", node.Meta())
-		for i, child := range children {
-			fmt.Println("Test Child: ", i, child.Meta().(model.NodeMeta))
-		}
-	} else {
-		fmt.Println("NOT FOUND")
-	}
-	fmt.Println("Build Config", *buildConfig)
-	fmt.Printf("dim1: %+v\n", *buildConfig.ConfigMap["dim1"])
+	t, buildConfig := model.Create(src, dst)
 	return t, buildConfig
 }
 

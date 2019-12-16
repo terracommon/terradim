@@ -1,3 +1,2 @@
-args:
-  bar: n1-prod
-  argLevel: 2-2
+bar: n1-prod
+argLevel: 2-2

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -47,6 +46,12 @@ type BuildConfig struct {
 
 type buildData map[string]interface{}
 
+type nodeConfig struct {
+	Name    string   `yaml:"name"`
+	Outfile string   `yaml:"outfile"`
+	Enum    []string `yaml:"enum,flow"`
+}
+
 // ModelConfig list enumerable dirs
 var ModelConfig = TerradimConfigMap{
 	"dim1": &TerradimConfig{Config: nodeConfig{}},
@@ -54,19 +59,17 @@ var ModelConfig = TerradimConfigMap{
 }
 
 // Create tree model
-func Create(dirpath string) (*Tree, *BuildConfig) {
+func Create(dirpath, outDir string) (*Tree, *BuildConfig) {
 	var (
 		parent     *Node
-		node       *Node
 		parentMeta NodeMeta
 	)
-	outDir := "live"
 	dirname, basename := filepath.Split(dirpath)
 	model := NewTree()
 	buildConfig := &BuildConfig{
 		ConfigMap:      ModelConfig,
 		FileRootPrefix: dirpath,
-		FileOutPrefix:  dirpath[:len(dirname)] + outDir,
+		FileOutPrefix:  outDir,
 		PathSeparator:  model.Separator(),
 	}
 	lastDirname := dirpath
@@ -94,7 +97,7 @@ func Create(dirpath string) (*Tree, *BuildConfig) {
 				meta.IsDir = true
 				if _, ok := ModelConfig[basename]; ok == true {
 					if err != nil {
-						panic(err)
+						return err
 					}
 					meta.IsEnum = true
 					buildConfig.ConfigMap[basename].Path = curpath
@@ -117,21 +120,14 @@ func Create(dirpath string) (*Tree, *BuildConfig) {
 			if parentMeta.IsConfig == true {
 				meta.IsConfig = true
 			}
-			//fmt.Println(curpath, meta)
-			node, _ = model.Insert(curpath, meta)
-			fmt.Println(curpath, meta, node.prefix, node.key)
+
+			_, _ = model.Insert(curpath, meta)
 			return nil
 		})
 	if err != nil {
-		log.Println(err)
+		panic(err)
 	}
 	return model, buildConfig
-}
-
-type nodeConfig struct {
-	Name    string   `yaml:"name"`
-	Outfile string   `yaml:"outfile"`
-	Enum    []string `yaml:"enum,flow"`
 }
 
 func loadNodeConfig(curpath string) nodeConfig {
@@ -144,56 +140,9 @@ func loadNodeConfig(curpath string) nodeConfig {
 	return config
 }
 
-func loadConfig(curPath string) (nodeConfig, error) {
-	var config nodeConfig
-	_, fileName := filepath.Split(curPath)
-
-	scope := &lang.Scope{
-		BaseDir: ".",
-	}
-	exprTxt := fmt.Sprintf(`yamldecode(file("%v"))`, curPath)
-	expr, parseDiags := hclsyntax.ParseExpression([]byte(exprTxt), fileName, hcl.Pos{Line: 1, Column: 1})
-	if parseDiags.HasErrors() {
-		for _, diag := range parseDiags {
-			fmt.Println(diag.Error())
-		}
-		panic("ParseExpression Error")
-	}
-	got, diags := scope.EvalExpr(expr, cty.DynamicPseudoType)
-	if diags.HasErrors() {
-		for _, diag := range diags {
-			fmt.Printf("%s: %s", diag.Description().Summary, diag.Description().Detail)
-		}
-		panic("EvalExpr Error")
-	}
-
-	value := got
-	fmt.Printf("lang type: %v - %v - %#v - %v\n", exprTxt, expr, value, value.Type().FriendlyName())
-
-	//for friendly name got.AsValueMap()["args"].AsValueMap()["foo"].Type().FriendlyName()
-
-	//argsInt := struct{ Enum []string }{
-	//	Enum: make([]string, 0),
-	//}
-	//err := gocty.FromCtyValue(value, &argsInt)
-	//if err != nil {
-	//	panic(err)
-	//}
-	//fmt.Println("ArgsInt: ", argsInt)
-
-	filedata, err := ioutil.ReadFile(curPath)
-	if err != nil {
-		return config, err
-	}
-	yaml.Unmarshal(filedata, &config)
-	fmt.Printf("Yaml values:\n%v\n", config)
-	return config, nil
-}
-
 // Write model to file
 func Write(t *Tree, config *BuildConfig) error {
 	root := t.Root()
-	fmt.Printf("Root: %+v\n", root)
 	WalkSubtree(root, buildFunc, buildData{"buildConfig": config})
 	return nil
 }
@@ -203,10 +152,7 @@ func buildFunc(node *Node, data interface{}) (bool, error) {
 	if node.Meta() == nil {
 		return true, nil
 	}
-	var (
-		err       error
-		writePath string
-	)
+	var err error
 	meta := node.Meta().(NodeMeta)
 	key := node.Key()
 	path := node.Path()
@@ -215,11 +161,8 @@ func buildFunc(node *Node, data interface{}) (bool, error) {
 	if ok == false {
 		return false, errors.New("buildFunc: Must pass in BuildConfig as data")
 	}
-	//fmt.Println("Walk: ", meta.Dirname, meta.Basename, dataMap)
+
 	if meta.IsConfig {
-		if meta.IsDir == false {
-			//fmt.Printf("Config %s\n", writePath)
-		}
 		return false, nil
 	}
 	if meta.IsEnum && meta.IsDir {
@@ -241,11 +184,15 @@ func buildFunc(node *Node, data interface{}) (bool, error) {
 					}
 				}
 			}
-			writePath, err = copyToDst(path, &dataMap)
+			_, err = copyToDst(path, &dataMap)
 			if err != nil {
 				return true, err
 			}
-			fmt.Printf("Write: %s   ->   %s\n", path, writePath)
+
+			_, err = writeDimConfig(node, &dataMap)
+			if err != nil {
+				return true, err
+			}
 
 			for _, child := range node.Children() {
 				WalkSubtree(child, buildFunc, dataMap)
@@ -253,11 +200,10 @@ func buildFunc(node *Node, data interface{}) (bool, error) {
 		}
 		return false, nil
 	}
-	writePath, err = copyToDst(path, &dataMap)
+	_, err = copyToDst(path, &dataMap)
 	if err != nil {
 		return true, err
 	}
-	fmt.Printf("Write: %s   ->   %s\n", path, writePath)
 	return true, nil
 }
 
@@ -291,6 +237,7 @@ func copyToDst(path string, data *buildData) (dst string, err error) {
 	}
 
 	err = Copy(path, dst)
+	//TODO: if flag --verbose fmt.Printf("Write: %s  ->  %s\n", path, dst)
 	return
 }
 
@@ -310,14 +257,14 @@ func collectDimConfigs(enumNode *Node, data *buildData) ([]string, error) {
 		dims = append(dims, child.Path())
 	}
 	if child := configNode.getChild(dataMap[key].(string)); child != nil && dimLevel == 2 {
-		if gChild := configNode.getChild(dataMap[key].(string) + ext); gChild != nil {
+		if gChild := child.getChild(dataMap[key].(string) + ext); gChild != nil {
 			dims = append(dims, gChild.Path())
 		}
-		gridKey := fmt.Sprintf("%s_%s%s", key, dataMap[dimBase+"1"], ext)
-		if gChild := configNode.getChild(dataMap[key].(string) + ext); gChild != nil {
+		gridKey := fmt.Sprintf("%s_%s%s", dataMap[key], dataMap[dimBase+"1"], ext)
+		if gChild := child.getChild(dataMap[key].(string) + ext); gChild != nil {
 			dims = append(dims, gChild.Path())
 		}
-		if gChild := configNode.getChild(gridKey); gChild != nil {
+		if gChild := child.getChild(gridKey); gChild != nil {
 			dims = append(dims, gChild.Path())
 		}
 	}
@@ -348,11 +295,11 @@ func mergeDimConfigs(configPaths []string) (string, error) {
 		for _, diag := range diags {
 			fmt.Printf("%s: %s", diag.Description().Summary, diag.Description().Detail)
 		}
-		panic("EvalExpr Error")
+		return "", errors.New("mergeDimConfigs: EvalExpr Error")
 	}
 
 	var config string
-	err := gocty.FromCtyValue(got, config)
+	err := gocty.FromCtyValue(got, &config)
 	return config, err
 }
 
@@ -373,18 +320,21 @@ func writeDimConfig(enumNode *Node, data *buildData) (string, error) {
 		return "", err
 	}
 
+	enumPath := enumNode.Path()
 	configName := buildConfig.ConfigMap[enumNode.Key()].Config.Outfile
-	path := fmt.Sprintf("%s%s%s", enumNode.Path(), enumNode.Sep(), configName)
-	dst, err := createWritePath(path, data)
+	configPath := fmt.Sprintf("%s%s%s", enumPath, enumNode.Sep(), configName)
+	dst, err := createWritePath(configPath, data)
 	if err != nil {
 		return "", err
 	}
 
-	info, err := os.Stat(path)
+	info, err := os.Stat(enumPath)
 	if err != nil {
 		return "", err
 	}
 
 	err = ioutil.WriteFile(dst, []byte(dimConfig), info.Mode())
+
+	// TODO: if flag --verbose fmt.Printf("Write Config: ->  %s\n", writePath)
 	return dst, err
 }
