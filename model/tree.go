@@ -67,7 +67,11 @@ func (n *Node) Key() string {
 
 // Path returns full node path
 func (n *Node) Path() string {
-	return fmt.Sprintf("%s%s%s", n.prefix, *n.sep, n.key)
+	p := n.key
+	if n.prefix != "" {
+		p = fmt.Sprintf("%s%s%s", n.prefix, *n.sep, p)
+	}
+	return p
 }
 
 // Children returns children stored in node
