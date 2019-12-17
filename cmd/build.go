@@ -20,8 +20,11 @@ WARNING: This command will replace the contents of the dst directory.`,
 		src := viper.GetString("src")
 		dst := viper.GetString("dst")
 		fmt.Printf("Building from %s to %s\n", src, dst)
+
 		t, buildConfig := buildModel(src, dst)
-		_ = buildDirTree(t, buildConfig)
+		if err := writeToFile(t, buildConfig); err != nil {
+			panic(err)
+		}
 		fmt.Println("Build Complete")
 	},
 }
@@ -54,7 +57,7 @@ func buildModel(src, dst string) (*model.Tree, *model.BuildConfig) {
 	return t, buildConfig
 }
 
-func buildDirTree(t *model.Tree, config *model.BuildConfig) error {
+func writeToFile(t *model.Tree, config *model.BuildConfig) error {
 	err := model.Write(t, config)
 	return err
 }

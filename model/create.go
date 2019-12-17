@@ -59,21 +59,21 @@ var ModelConfig = TerradimConfigMap{
 }
 
 // Create tree model
-func Create(dirpath, outDir string) (*Tree, *BuildConfig) {
+func Create(srcpath, dstpath string) (*Tree, *BuildConfig) {
 	var (
 		parent     *Node
 		parentMeta NodeMeta
 	)
-	dirname, basename := filepath.Split(dirpath)
+	dirname, basename := filepath.Split(srcpath)
 	model := NewTree()
 	buildConfig := &BuildConfig{
 		ConfigMap:      ModelConfig,
-		FileRootPrefix: dirpath,
-		FileOutPrefix:  outDir,
+		FileRootPrefix: srcpath,
+		FileOutPrefix:  dstpath,
 		PathSeparator:  model.Separator(),
 	}
-	lastDirname := dirpath
-	err := filepath.Walk(dirpath,
+	lastDirname := srcpath
+	err := filepath.Walk(srcpath,
 		func(curpath string, info os.FileInfo, err error) error {
 			if err != nil {
 				return err
@@ -84,7 +84,7 @@ func Create(dirpath, outDir string) (*Tree, *BuildConfig) {
 				Basename: basename,
 				Size:     info.Size(),
 			}
-			if curpath != dirpath && dirname != lastDirname {
+			if curpath != srcpath && dirname != lastDirname {
 				lastDirname = dirname
 				parent, _ = model.Find(dirname[:len(dirname)-1])
 				if parent.meta == nil {
