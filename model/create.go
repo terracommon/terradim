@@ -212,7 +212,6 @@ func buildFunc(node *Node, data interface{}) (bool, error) {
 }
 
 func createWritePath(src string, data *buildData) (dst string, err error) {
-	fmt.Println("SRC", src)
 	dataMap := *data
 	buildConfig, ok := dataMap["buildConfig"].(*BuildConfig)
 	if ok == false {
