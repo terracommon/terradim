@@ -47,6 +47,9 @@ func init() {
 
 	buildCmd.Flags().StringP("dst", "d", "terraform/live", "Path to build output")
 	viper.BindPFlag("dst", buildCmd.Flags().Lookup("dst"))
+
+	buildCmd.Flags().BoolP("verbose", "v", false, "Verbose output to stdout")
+	viper.BindPFlag("verbose", buildCmd.Flags().Lookup("verbose"))
 }
 
 func buildModel(src, dst string) (*model.Tree, *model.BuildConfig) {

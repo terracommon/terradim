@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclsyntax"
 	"github.com/hashicorp/terraform/lang"
+	"github.com/spf13/viper"
 	"github.com/zclconf/go-cty/cty"
 	"github.com/zclconf/go-cty/cty/gocty"
 	"gopkg.in/yaml.v3"
@@ -122,6 +123,9 @@ func Create(srcpath, dstpath string) (*Tree, *BuildConfig) {
 			}
 
 			_, _ = model.Insert(curpath, meta)
+			if viper.GetBool("verbose") == true {
+				fmt.Printf("Insert: %s - %+v\n", curpath, meta)
+			}
 			return nil
 		})
 	if err != nil {
@@ -238,6 +242,9 @@ func copyToDst(path string, data *buildData) (dst string, err error) {
 
 	err = Copy(path, dst)
 	//TODO: if flag --verbose fmt.Printf("Write: %s  ->  %s\n", path, dst)
+	if viper.GetBool("verbose") == true {
+		fmt.Printf("Write: %s  ->  %s\n", path, dst)
+	}
 	return
 }
 
@@ -336,5 +343,8 @@ func writeDimConfig(enumNode *Node, data *buildData) (string, error) {
 	err = ioutil.WriteFile(dst, []byte(dimConfig), info.Mode())
 
 	// TODO: if flag --verbose fmt.Printf("Write Config: ->  %s\n", writePath)
+	if viper.GetBool("verbose") == true {
+		fmt.Printf("Write Config: ->  %s\n", dst)
+	}
 	return dst, err
 }
